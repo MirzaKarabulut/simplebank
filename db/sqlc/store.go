@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
 )
 
 // Store provides all functions to execute db queries and transactions
@@ -53,15 +52,10 @@ type TransferTxResult struct {
 	ToEntry Entry `json:"to_entry"`
 }
 
-var txKey = struct{}{}
-
 // TransferTx performs a money transfer from one account to the other
 // It creates a transfer record and update account balances within a single database transaction
 func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (TransferTxResult, error) {
 	var result TransferTxResult
-
-	txName := ctx.Value(txKey)
-	fmt.Println(txName, "Creating transfer") 
 
 	err := store.ExecTx(ctx, func(q *Queries) error {
 		var err error
@@ -73,7 +67,6 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 			return err
 		}
 
-		fmt.Println(txName, "Create Entry 1")
 		result.FromEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID: arg.FromAccountID,
 			Amount: -arg.Amount,
@@ -81,8 +74,7 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 		if err != nil {
 			return err
 		}
-
-		fmt.Println(txName, "Create Entry 2")
+		
 		result.ToEntry, err = q.CreateEntry(ctx, CreateEntryParams{
 			AccountID: arg.ToAccountID,
 			Amount: arg.Amount,
@@ -91,32 +83,17 @@ func (store *Store) TransferTx(ctx context.Context, arg TransferTxParams) (Trans
 			return err
 		}
 
-		// get account -> update account balances
-		fmt.Println(txName, "Get account 1")
-		account1, err := store.GetAccountForUpdate(ctx, arg.FromAccountID)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(txName, "Update account 1")
-		result.FromAccount, err = store.UpdateAccount(ctx, UpdateAccountParams{
+		result.FromAccount, err = store.AddAccountBalance(ctx, AddAccountBalanceParams{
 			ID: arg.FromAccountID,
-			Balance: account1.Balance - arg.Amount,
+			Amount: -arg.Amount,
 		})
 		if err != nil {
 			return err
 		}
-
-		fmt.Println(txName, "Get account 2")
-		account2, err := store.GetAccountForUpdate(ctx, arg.ToAccountID)
-		if err != nil {
-			return err
-		}
-
-		fmt.Println(txName, "Update account 2")
-		result.ToAccount, err = store.UpdateAccount(ctx, UpdateAccountParams{
+		
+		result.ToAccount, err = store.AddAccountBalance(ctx, AddAccountBalanceParams{
 			ID: arg.ToAccountID,
-			Balance: account2.Balance + arg.Amount,
+			Amount: arg.Amount,
 		})
 		if err != nil {
 			return err
