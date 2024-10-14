@@ -1,6 +1,9 @@
 package util
 
-import "math/rand"
+import (
+	"fmt"
+	"math/rand"
+)
 
 func RandomInteger(min, max int) int {
 	return min + rand.Intn(max - min + 1) // min -> n
@@ -27,4 +30,9 @@ func RandomCurrency() string {
 	currencies := []string{USD, EUR, CAD}
 	n := len(currencies)
 	return currencies[rand.Intn(n)] // n -> len(currencies)
+}
+
+
+func RandomEmail() string {
+	return fmt.Sprintf("%s@email.com", RandomString(6))
 }
