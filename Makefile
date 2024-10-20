@@ -27,7 +27,7 @@ sqlc:
 test:
 	go test -v -cover ./...
 
-server:
+run:
 	go run main.go
 
 mock:
