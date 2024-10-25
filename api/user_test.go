@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,8 +19,8 @@ import (
 )
 
 type eqCreateUserParamsMatcher struct {
-	arg	db.CreateUserParams
-	password	string
+	arg      db.CreateUserParams
+	password string
 }
 
 func (e eqCreateUserParamsMatcher) Matches(x interface{}) bool {
@@ -28,10 +28,12 @@ func (e eqCreateUserParamsMatcher) Matches(x interface{}) bool {
 	if !ok {
 		return false
 	}
+
 	err := util.CheckPassword(e.password, arg.HashedPassword)
 	if err != nil {
 		return false
 	}
+
 	e.arg.HashedPassword = arg.HashedPassword
 	return reflect.DeepEqual(e.arg, arg)
 }
@@ -48,7 +50,7 @@ func TestCreateUserAPI(t *testing.T) {
 	user, password := randomUser(t)
 
 	// Test case for POST user
-	testCase := []struct{
+	testCases := []struct{
 		name	string
 		body	gin.H
 		buildStubs	func(store *mockdb.MockStore)
@@ -80,8 +82,8 @@ func TestCreateUserAPI(t *testing.T) {
 	},
 }
 
-	for i := range testCase {
-		tc := testCase[i]
+	for i := range testCases {
+		tc := testCases[i]
 
 		t.Run(tc.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
@@ -90,18 +92,19 @@ func TestCreateUserAPI(t *testing.T) {
 			store := mockdb.NewMockStore(ctrl)
 			tc.buildStubs(store)
 
-			server := NewServer(store)
+			server := newTestServer(t, store)
 			recorder := httptest.NewRecorder()
 
+			// Marshal body data to JSON
 			data, err := json.Marshal(tc.body)
 			require.NoError(t, err)
 
 			url := "/users"
-			request, err := http.NewRequest(http.MethodGet, url, bytes.NewReader(data))
-      require.NoError(t, err)
+			request, err := http.NewRequest(http.MethodPost, url, bytes.NewReader(data))
+			require.NoError(t, err)
 
 			server.router.ServeHTTP(recorder, request)
-      tc.checkResponse(recorder)
+			tc.checkResponse(recorder)
 		})
 	}
 }
@@ -110,25 +113,24 @@ func randomUser(t *testing.T) (user db.User, password string) {
 	password = util.RandomString(6)
 	hashedPassword, err := util.HashedPassword(password)
 	require.NoError(t, err)
-	require.NotEmpty(t, hashedPassword)
 
-	user = db.User {
-		Username: util.RandomOwner(),
-		FullName: util.RandomOwner(),
+	user = db.User{
+		Username:       util.RandomOwner(),
 		HashedPassword: hashedPassword,
-		Email: util.RandomEmail(),
+		FullName:       util.RandomOwner(),
+		Email:          util.RandomEmail(),
 	}
 	return
 }
 
 func requireBodyMatchUser(t *testing.T, body *bytes.Buffer, user db.User) {
-	data, err := ioutil.ReadAll(body)
+	data, err := io.ReadAll(body)
 	require.NoError(t, err)
 
 	var gotUser db.User
 	err = json.Unmarshal(data, &gotUser)
-	require.NoError(t, err)
 
+	require.NoError(t, err)
 	require.Equal(t, user.Username, gotUser.Username)
 	require.Equal(t, user.FullName, gotUser.FullName)
 	require.Equal(t, user.Email, gotUser.Email)
