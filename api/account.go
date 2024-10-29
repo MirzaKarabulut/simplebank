@@ -3,7 +3,6 @@ package api
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 
 	db "github.com/MirzaKarabulut/simplebank/db/sqlc"
@@ -84,7 +83,6 @@ type listAccountRequest struct {
 
 func (server *Server) listAccount(ctx *gin.Context) {
     var req listAccountRequest
-		fmt.Println("REQUEST",req)
     if err := ctx.ShouldBindQuery(&req); err != nil {
         ctx.JSON(http.StatusBadRequest, errorResponse(err))
         return
